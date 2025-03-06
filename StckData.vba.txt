@@ -1,0 +1,141 @@
+' Loop through all sheets in the workbook and process stock data
+Sub ProcessStockData()
+    Dim ws As Worksheet
+    Dim lastRow As Long
+    Dim i As Long
+    Dim summaryRow As Long
+    Dim greatestIncrease As Double
+    Dim greatestDecrease As Double
+    Dim greatestVolume As Double
+    Dim greatestIncreaseTicker As String
+    Dim greatestDecreaseTicker As String
+    Dim greatestVolumeTicker As String
+    
+    greatestIncrease = 0
+    greatestDecrease = 0
+    greatestVolume = 0
+    
+    ' Loop through each sheet in the workbook
+    For Each ws In ThisWorkbook.Sheets
+        ' Find the last row with data
+        lastRow = ws.Cells(ws.Rows.Count, 1).End(xlUp).Row
+        
+        ' Add headers for summary data on the same sheet
+        ws.Cells(1, 9).Value = "Ticker"
+        ws.Cells(1, 10).Value = "Total Volume"
+        ws.Cells(1, 11).Value = "Quarterly Change ($)"
+        ws.Cells(1, 12).Value = "Percent Change"
+        
+        summaryRow = 2
+        
+        Dim ticker As String
+        Dim totalVolume As Double
+        Dim openPrice As Variant
+        Dim closePrice As Variant
+        Dim firstRow As Long
+        Dim lastTickerRow As Long
+        
+        i = 2
+        While i <= lastRow
+            ticker = ws.Cells(i, 1).Value
+            totalVolume = 0
+            firstRow = i
+            
+            ' Accumulate volume and find last occurrence of ticker
+            Do While i <= lastRow And ws.Cells(i, 1).Value = ticker
+                If IsNumeric(ws.Cells(i, 7).Value) Then
+                    totalVolume = totalVolume + ws.Cells(i, 7).Value
+                End If
+                lastTickerRow = i
+                i = i + 1
+            Loop
+            
+            ' Get open and close prices for the quarter
+            If IsNumeric(ws.Cells(firstRow, 3).Value) Then
+                openPrice = ws.Cells(firstRow, 3).Value
+            Else
+                openPrice = 0
+            End If
+            
+            If IsNumeric(ws.Cells(lastTickerRow, 6).Value) Then
+                closePrice = ws.Cells(lastTickerRow, 6).Value
+            Else
+                closePrice = 0
+            End If
+            
+            ' Store results in the summary section
+            ws.Cells(summaryRow, 9).Value = ticker
+            ws.Cells(summaryRow, 10).Value = totalVolume
+            ws.Cells(summaryRow, 11).Value = closePrice - openPrice ' Quarterly Change
+            
+            ' Avoid division by zero error
+            Dim percentChange As Variant
+            If openPrice <> 0 Then
+                percentChange = (closePrice - openPrice) / openPrice
+                ws.Cells(summaryRow, 12).Value = percentChange
+                ws.Cells(summaryRow, 12).NumberFormat = "0.00%" ' Format as percentage
+            Else
+                percentChange = "N/A"
+                ws.Cells(summaryRow, 12).Value = "N/A"
+            End If
+            
+            ' Track greatest increase, decrease, and volume
+            If percentChange <> "N/A" Then
+                If percentChange > greatestIncrease Then
+                    greatestIncrease = percentChange
+                    greatestIncreaseTicker = ticker
+                End If
+                If percentChange < greatestDecrease Then
+                    greatestDecrease = percentChange
+                    greatestDecreaseTicker = ticker
+                End If
+            End If
+            
+            If totalVolume > greatestVolume Then
+                greatestVolume = totalVolume
+                greatestVolumeTicker = ticker
+            End If
+            
+            summaryRow = summaryRow + 1
+        Wend
+        
+        ' Apply conditional formatting to Quarterly Change column
+        Dim changeRange As Range
+        Set changeRange = ws.Range("K2:K" & summaryRow - 1)
+        
+        ' Green for positive change
+        With changeRange.FormatConditions.Add(Type:=xlCellValue, Operator:=xlGreater, Formula1:="0")
+            .Interior.Color = RGB(144, 238, 144) ' Light Green
+        End With
+        
+        ' Red for negative change
+        With changeRange.FormatConditions.Add(Type:=xlCellValue, Operator:=xlLess, Formula1:="0")
+            .Interior.Color = RGB(255, 99, 71) ' Tomato Red
+        End With
+        
+        ' Apply conditional formatting to Percent Change column
+        Dim percentRange As Range
+        Set percentRange = ws.Range("L2:L" & summaryRow - 1)
+        
+        ' Green for positive percent change
+        With percentRange.FormatConditions.Add(Type:=xlCellValue, Operator:=xlGreater, Formula1:="0")
+            .Interior.Color = RGB(144, 238, 144) ' Light Green
+        End With
+        
+        ' Red for negative percent change
+        With percentRange.FormatConditions.Add(Type:=xlCellValue, Operator:=xlLess, Formula1:="0")
+            .Interior.Color = RGB(255, 99, 71) ' Tomato Red
+        End With
+        
+        ' Auto-fit columns for better readability
+        ws.Columns("I:L").AutoFit
+    Next ws
+    
+    ' Display results in a message box
+    MsgBox "Stock data summary complete!" & vbNewLine & _
+           "Greatest % Increase: " & greatestIncreaseTicker & " (" & Format(greatestIncrease, "0.00%") & ")" & vbNewLine & _
+           "Greatest % Decrease: " & greatestDecreaseTicker & " (" & Format(greatestDecrease, "0.00%") & ")" & vbNewLine & _
+           "Greatest Total Volume: " & greatestVolumeTicker & " (" & greatestVolume & ")", vbInformation
+End Sub
+
+
